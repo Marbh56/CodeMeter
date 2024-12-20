@@ -108,7 +108,7 @@ func getGitContributors(path string) (map[string]FileContributor, bool, error) {
 			fmt.Sscanf(fields[0], "%d", &commitCount)
 			name := strings.Join(fields[1:], " ")
 			if contrib, ok := contributors[name]; ok {
-				contrib.Commits = len(fields)
+				contrib.Commits = commitCount
 				contributors[name] = contrib
 			}
 		}
@@ -121,19 +121,20 @@ func scanDirectory(dirPath string) (DirStats, error) {
 		Contributors: make(map[string]FileContributor),
 	}
 
-	contributors, isGitRepo, err := getGitContributors(dirPath)
-	if err != nil {
-		return stats, fmt.Errorf("error getting git contributors: %v", err)
-	}
-	stats.Contributors = contributors
-	stats.IsGitRepo = isGitRepo
-
-	err = filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if info.IsDir() {
+		if info.IsDir() && info.Name() == ".git" {
+			return filepath.SkipDir
+		}
+
+		if info.IsDir() || strings.HasPrefix(info.Name(), ".") {
+			return nil
+		}
+
+		if strings.Contains(path, ".git") {
 			return nil
 		}
 
@@ -154,9 +155,13 @@ func scanDirectory(dirPath string) (DirStats, error) {
 		return nil
 	})
 
+	contributors, isGitRepo, err := getGitContributors(dirPath)
 	if err != nil {
-		return stats, fmt.Errorf("error walking the directory: %v", err)
+		return stats, fmt.Errorf("error getting git contributors: %v", err)
 	}
+	stats.Contributors = contributors
+	stats.IsGitRepo = isGitRepo
+
 	return stats, nil
 }
 
@@ -208,7 +213,7 @@ func handleSaveCommand(args string) {
 	report := fmt.Sprintf("Directory Scan Report\n"+"Generated: %s\n\n"+
 		"Directory: %s\n"+
 		"Total Files: %d\n"+
-		"Toal Files: %d\n",
+		"Total Lines: %d\n",
 		time.Now().Format(time.RFC1123),
 		dirPath,
 		stats.FileCount,
@@ -219,7 +224,7 @@ func handleSaveCommand(args string) {
 		for _, contrib := range stats.Contributors {
 			report += fmt.Sprintf("- %s:\n"+
 				"	Commits: %d\n"+
-				"	Lines: %d\n"+
+				"	Lines: %d\n",
 				contrib.Name,
 				contrib.Commits,
 				contrib.LineCount)
