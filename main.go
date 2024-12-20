@@ -35,6 +35,8 @@ func repl() {
 			handleScanCommand(args)
 		case "save":
 			handleSaveCommand(args)
+		case "help":
+			handleHelpCommand()
 		default:
 			fmt.Println("Unknown command")
 		}
@@ -210,14 +212,21 @@ func handleSaveCommand(args string) {
 	}
 	defer file.Close()
 
-	report := fmt.Sprintf("Directory Scan Report\n"+"Generated: %s\n\n"+
+	cmd := exec.Command("go", "test", "./...", "-cover")
+	coverageOutput, err := cmd.CombinedOutput()
+	coverageStr := string(coverageOutput)
+
+	report := fmt.Sprintf("Directory Scan Report\n"+
+		"Generated: %s\n\n"+
 		"Directory: %s\n"+
 		"Total Files: %d\n"+
-		"Total Lines: %d\n",
+		"Total Lines: %d\n"+
+		"Test Coverage: %s\n",
 		time.Now().Format(time.RFC1123),
 		dirPath,
 		stats.FileCount,
-		stats.LineCount)
+		stats.LineCount,
+		coverageStr)
 
 	if stats.IsGitRepo {
 		report += "\nGit Contributors:\n"
@@ -236,4 +245,12 @@ func handleSaveCommand(args string) {
 		return
 	}
 	fmt.Printf("Report saved to %s\n", outputFile)
+}
+
+func handleHelpCommand() {
+	fmt.Println("Available commands:")
+	fmt.Println("scan [directory] -- Count files and lines in directory")
+	fmt.Println("save [directory] [output-file] -- Save directory scan report to file")
+	fmt.Print("help -- Display this help message\n")
+	fmt.Println("exit -- Exit the program")
 }
